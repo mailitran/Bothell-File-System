@@ -83,13 +83,42 @@ i32 fsOpen(str fname) {
 // read (may be less than 'numb' if we hit EOF).  On failure, abort
 // ============================================================================
 i32 fsRead(i32 fd, i32 numb, void* buf) {
+  i32 inum = bfsFdToInum(fd);
+  i32 curs = bfsTell(fd);          // Current cursor position
+  i32 fileSize = bfsGetSize(inum); // File size
 
-  // ++++++++++++++++++++++++
-  // Insert your code here
-  // ++++++++++++++++++++++++
+  if (curs >= fileSize) return 0;  // Cursor is at or beyond EOF (no bytes read)
+  if ((curs + numb) > fileSize) numb = fileSize - curs; // Adjust numb to remaining bytes
 
-  FATAL(ENYI);                                  // Not Yet Implemented!
-  return 0;
+  i32 fbn = curs / BYTESPERBLOCK;    // FBN of block that the cursor is in
+  i32 offset = curs % BYTESPERBLOCK; // Offset of cursor within the block
+  i32 num_blocks = (fileSize + BYTESPERBLOCK - 1) / BYTESPERBLOCK; // Total number of blocks
+  
+  i32 bytes_read = 0;
+
+  // If cursor is in the middle of a block, read the remainder of the current block 
+  if (offset != 0) {
+    i8 bioBuf[BYTESPERBLOCK];   // Allocate temporary buffer
+    bfsRead(inum, fbn, bioBuf); // Read current block into the buffer
+    i32 to_read = (numb < BYTESPERBLOCK - offset) ? numb : BYTESPERBLOCK - offset;
+    memcpy(buf, bioBuf + offset, to_read);
+    fsSeek(fd, to_read, SEEK_CUR); // Adjust cursor position by the bytes read
+    bytes_read += to_read;
+    if (bytes_read == numb) return bytes_read;
+    fbn++; // Move to next FBN
+  }
+
+  while ((bytes_read < numb) && (fbn < num_blocks)) {
+    i32 to_read = ((numb - bytes_read) < BYTESPERBLOCK) ? (numb - bytes_read) : BYTESPERBLOCK;
+    i8 bioBuf[BYTESPERBLOCK];   // Allocate temporary buffer
+    bfsRead(inum, fbn, bioBuf); // Read current block into the buffer
+    memcpy(buf + bytes_read, bioBuf, to_read);
+    fsSeek(fd, to_read, SEEK_CUR); // Adjust cursor position by the bytes read
+    bytes_read += to_read;
+    fbn++; // Move to next FBN
+  }
+
+  return bytes_read; // Return total bytes read
 }
 
 
