@@ -84,15 +84,15 @@ i32 fsOpen(str fname) {
 // ============================================================================
 i32 fsRead(i32 fd, i32 numb, void* buf) {
   i32 inum = bfsFdToInum(fd);
-  i32 curs = bfsTell(fd);          // Current cursor position
-  i32 fileSize = bfsGetSize(inum); // File size
+  i32 curs = bfsTell(fd);      // Current cursor position
+  i32 size = bfsGetSize(inum); // File size
 
-  if (curs >= fileSize) return 0;  // Cursor is at or beyond EOF (no bytes read)
-  if ((curs + numb) > fileSize) numb = fileSize - curs; // Adjust numb to remaining bytes
+  if (curs >= size) return 0;  // Cursor is at or beyond EOF (no bytes read)
+  if ((curs + numb) > size) numb = size - curs; // Adjust numb to remaining bytes
 
   i32 fbn = curs / BYTESPERBLOCK;    // FBN of block that the cursor is in
   i32 offset = curs % BYTESPERBLOCK; // Offset of cursor within the block
-  i32 num_blocks = (fileSize + BYTESPERBLOCK - 1) / BYTESPERBLOCK; // Total number of blocks
+  i32 num_blocks = (size + BYTESPERBLOCK - 1) / BYTESPERBLOCK; // Total number of blocks
   
   i32 bytes_read = 0;
 
@@ -105,7 +105,7 @@ i32 fsRead(i32 fd, i32 numb, void* buf) {
     fsSeek(fd, to_read, SEEK_CUR); // Adjust cursor position by the bytes read
     bytes_read += to_read;
     if (bytes_read == numb) return bytes_read;
-    fbn++; // Move to next FBN
+    fbn++;                         // Move to next FBN
   }
 
   while ((bytes_read < numb) && (fbn < num_blocks)) {
@@ -115,7 +115,7 @@ i32 fsRead(i32 fd, i32 numb, void* buf) {
     memcpy(buf + bytes_read, bioBuf, to_read);
     fsSeek(fd, to_read, SEEK_CUR); // Adjust cursor position by the bytes read
     bytes_read += to_read;
-    fbn++; // Move to next FBN
+    fbn++;                         // Move to next FBN
   }
 
   return bytes_read; // Return total bytes read
@@ -188,13 +188,13 @@ i32 fsSize(i32 fd) {
 i32 fsWrite(i32 fd, i32 numb, void* buf) {
   i32 inum = bfsFdToInum(fd);
   i32 curs = bfsTell(fd);          // Current cursor position
-  i32 fileSize = bfsGetSize(inum); // File size
+  i32 size = bfsGetSize(inum); // File size
 
   i32 fbn = curs / BYTESPERBLOCK;    // FBN of block that the cursor is in
   i32 offset = curs % BYTESPERBLOCK; // Offset of cursor within the block
-  i32 num_blocks = (fileSize + BYTESPERBLOCK - 1) / BYTESPERBLOCK; // Total number of blocks
+  i32 num_blocks = (size + BYTESPERBLOCK - 1) / BYTESPERBLOCK; // Total number of blocks
 
-  if ((curs + numb) > fileSize) {
+  if ((curs + numb) > size) {
     bfsExtend(inum, num_blocks);   // Extend file size
     bfsSetSize(inum, curs + numb); // Update file size
   }
@@ -219,7 +219,7 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
   while (bytes_written < numb)  {
     i8 bioBuf[BYTESPERBLOCK];      // Allocate temporary buffer
     i32 to_write = ((numb - bytes_written) < BYTESPERBLOCK) ? (numb - bytes_written) : BYTESPERBLOCK;
-    memcpy(bioBuf, buf, to_write); // Copy data from buf to temporary buffer
+    memcpy(bioBuf, buf, to_write);    // Copy data from buf to temporary buffer
     i32 dbn = bfsFbnToDbn(inum, fbn); // Convert FBN to DBN
     bioWrite(dbn, bioBuf);            // Write temporary buffer to disk
     fsSeek(fd, to_write, SEEK_CUR);   // Adjust cursor position by the bytes read
