@@ -109,9 +109,9 @@ i32 fsRead(i32 fd, i32 numb, void* buf) {
   }
 
   while ((bytes_read < numb) && (fbn < num_blocks)) {
-    i32 to_read = ((numb - bytes_read) < BYTESPERBLOCK) ? (numb - bytes_read) : BYTESPERBLOCK;
     i8 bioBuf[BYTESPERBLOCK];   // Allocate temporary buffer
     bfsRead(inum, fbn, bioBuf); // Read current block into the buffer
+    i32 to_read = ((numb - bytes_read) < BYTESPERBLOCK) ? (numb - bytes_read) : BYTESPERBLOCK;
     memcpy(buf + bytes_read, bioBuf, to_read);
     fsSeek(fd, to_read, SEEK_CUR); // Adjust cursor position by the bytes read
     bytes_read += to_read;
@@ -186,11 +186,47 @@ i32 fsSize(i32 fd) {
 // destination file.  On success, return 0.  On failure, abort
 // ============================================================================
 i32 fsWrite(i32 fd, i32 numb, void* buf) {
+  i32 inum = bfsFdToInum(fd);
+  i32 curs = bfsTell(fd);          // Current cursor position
+  i32 fileSize = bfsGetSize(inum); // File size
 
-  // ++++++++++++++++++++++++
-  // Insert your code here
-  // ++++++++++++++++++++++++
+  i32 fbn = curs / BYTESPERBLOCK;    // FBN of block that the cursor is in
+  i32 offset = curs % BYTESPERBLOCK; // Offset of cursor within the block
+  i32 num_blocks = (fileSize + BYTESPERBLOCK - 1) / BYTESPERBLOCK; // Total number of blocks
 
-  FATAL(ENYI);                                  // Not Yet Implemented!
+  if ((curs + numb) > fileSize) {
+    bfsExtend(inum, num_blocks);   // Extend file size
+    bfsSetSize(inum, curs + numb); // Update file size
+  }
+
+  i32 bytes_written = 0;
+
+  // If cursor is in the middle of a block, write the remainder of the current block 
+  if (offset != 0) {
+    i8 bioBuf[BYTESPERBLOCK];   // Allocate temporary buffer
+    bfsRead(inum, fbn, bioBuf); // Read current block into the buffer
+    i32 to_write = (numb < BYTESPERBLOCK - offset) ? numb : BYTESPERBLOCK - offset;
+    memcpy(bioBuf + offset, buf, to_write); // Copy data from buf to temporary buffer
+    i32 dbn = bfsFbnToDbn(inum, fbn); // Convert FBN to DBN
+    bioWrite(dbn, bioBuf);            // Write temporary buffer to disk
+    fsSeek(fd, to_write, SEEK_CUR);   // Adjust cursor position by the bytes read
+    bytes_written += to_write;
+    if (bytes_written == numb) return 0;
+    buf = (i8*)buf + to_write; // Update buf pointer
+    fbn++;                     // Move to next FBN
+  }
+
+  while (bytes_written < numb)  {
+    i8 bioBuf[BYTESPERBLOCK];      // Allocate temporary buffer
+    i32 to_write = ((numb - bytes_written) < BYTESPERBLOCK) ? (numb - bytes_written) : BYTESPERBLOCK;
+    memcpy(bioBuf, buf, to_write); // Copy data from buf to temporary buffer
+    i32 dbn = bfsFbnToDbn(inum, fbn); // Convert FBN to DBN
+    bioWrite(dbn, bioBuf);            // Write temporary buffer to disk
+    fsSeek(fd, to_write, SEEK_CUR);   // Adjust cursor position by the bytes read
+    bytes_written += to_write;
+    buf = (i8*)buf + to_write; // Update buf pointer
+    fbn++;                     // Move to next FBN
+  }
+
   return 0;
 }
