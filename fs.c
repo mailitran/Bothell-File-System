@@ -218,6 +218,7 @@ i32 fsWrite(i32 fd, i32 numb, void* buf) {
 
   while (bytes_written < numb)  {
     i8 bioBuf[BYTESPERBLOCK];      // Allocate temporary buffer
+    bfsRead(inum, fbn, bioBuf);    // Read current block into the buffer
     i32 to_write = ((numb - bytes_written) < BYTESPERBLOCK) ? (numb - bytes_written) : BYTESPERBLOCK;
     memcpy(bioBuf, buf, to_write);    // Copy data from buf to temporary buffer
     i32 dbn = bfsFbnToDbn(inum, fbn); // Convert FBN to DBN
